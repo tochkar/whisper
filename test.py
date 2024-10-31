@@ -33,7 +33,7 @@ def list_s3_files():
 def process_file(file):
     """Processes a single MP3 file for transcription."""
     print("Processing", file)
-    model_type_needed = 'large-v3'
+    model_type_needed = 'large-v2'
     language = 'ru'
     local_file_path = 'audio/' + os.path.basename(file)
 
@@ -46,7 +46,10 @@ def process_file(file):
     print(f"Using model {model_type_needed} and language {language}")
     transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
 
-    print(json.dumps(transcription))
+    json_output = json.dumps(transcription, ensure_ascii=False, indent=4)
+
+    # Print the JSON output
+    print(json_output)
     # Save the transcription result to the output path in the S3 bucket
     # output_path = f'output/{os.path.basename(file)}.txt'
     # s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
