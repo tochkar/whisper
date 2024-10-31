@@ -11,7 +11,7 @@ load_dotenv()
 
 # Initialize AWS S3 resources
 bucket = os.environ['BUCKET']
-s3 = boto3.client('s3', region_name='us-east-1')
+s3 = boto3.client('s3', region_name='eu-west-1')
 s3_res = boto3.resource('s3')
 
 
