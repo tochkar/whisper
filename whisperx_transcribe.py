@@ -20,7 +20,10 @@ def transcribe(audio_file, model_needed, language=None):
         'initial_prompt': None, 'suppress_tokens': [-1], 'suppress_numerals': False,
         "repetition_penalty": 1,
         "prompt_reset_on_temperature": 0.5,
-        "no_repeat_ngram_size": 0
+        "no_repeat_ngram_size": 0,
+        "max_new_tokens": None,
+        "clip_timestamps": None,
+        "hallucination_silence_threshold": None,
     }
     vad_options = {'vad_onset': 0.5, 'vad_offset': 0.363}
 
