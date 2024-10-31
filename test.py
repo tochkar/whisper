@@ -4,7 +4,7 @@ import json
 import boto3
 from dotenv import load_dotenv
 from filelock import FileLock, Timeout
-# import whisperx_transcribe as wt
+import whisperx_transcribe as wt
 
 # Load environment variables
 load_dotenv()
@@ -43,13 +43,14 @@ def process_file(file):
         print(f"Failed to download file {file}: {e}. Skipping.")
         return
 
-    # print(f"Using model {model_type_needed} and language {language}")
-    # transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
-    #
-    # # Save the transcription result to the output path in the S3 bucket
+    print(f"Using model {model_type_needed} and language {language}")
+    transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
+
+    print(json.dumps(transcription))
+    # Save the transcription result to the output path in the S3 bucket
     # output_path = f'output/{os.path.basename(file)}.txt'
     # s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
-    #
+
     # # Optionally, delete the input file after processing if needed
     # s3_res.Object(bucket, file).delete()
 
