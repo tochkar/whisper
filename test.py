@@ -12,7 +12,8 @@ load_dotenv()
 
 # Initialize AWS S3 resources
 bucket = os.environ['BUCKET']
-s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['ACCESS_KEY'], aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
+s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['ACCESS_KEY'],
+                  aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 s3_res = boto3.resource('s3')
 
 
@@ -30,6 +31,7 @@ def list_s3_files():
         break
     print(files)
     return files
+
 
 def process_file(file):
     """Processes a single MP3 file for transcription."""
@@ -52,13 +54,22 @@ def process_file(file):
     # Print the JSON output
     print(json_output)
 
-    phrases = ' '.join(segment['phrase'] for segment in transcript)
+    api_key = os.environ('OPENAI_API_KEY')
+
+    if not api_key:
+        api_key = input("Enter your OpenAI API key: ")
+
+    client = OpenAI(api_key=api_key)
+
+
+phrases = ' '.join(segment['phrase'] for segment in transcript)
 
 # Prepare the request to OpenAI
 response = openai.ChatCompletion.create(
     model='gpt-4o',
     messages=[
-        {"role": "system", "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. Respond in Markdown."},
+        {"role": "system",
+         "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. Respond in Markdown."},
         {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
     ],
     temperature=0,
@@ -67,18 +78,20 @@ response = openai.ChatCompletion.create(
 # Print out the response from GPT-4
 print(response.choices[0].message.content)
 
-    # Save the transcription result to the output path in the S3 bucket
-    # output_path = f'output/{os.path.basename(file)}.txt'
-    # s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
 
-    # # Optionally, delete the input file after processing if needed
-    # s3_res.Object(bucket, file).delete()
+# Save the transcription result to the output path in the S3 bucket
+# output_path = f'output/{os.path.basename(file)}.txt'
+# s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
+
+# # Optionally, delete the input file after processing if needed
+# s3_res.Object(bucket, file).delete()
 
 def main():
     """Main function to process MP3 files using Whisper."""
     for file in list_s3_files():
         process_file(file)
     print("Done")
+
 
 if __name__ == "__main__":
     try:
