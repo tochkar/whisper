@@ -56,7 +56,7 @@ def process_file(file):
 
     transcript = json.loads(json_output)
 
-    api_key = os.environ('OPENAI_API_KEY')
+    api_key = os.environ['OPENAI_API_KEY']
 
     if not api_key:
         api_key = input("Enter your OpenAI API key: ")
