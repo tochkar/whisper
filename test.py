@@ -71,7 +71,7 @@ def process_file(file):
      model='gpt-4o',
         messages=[
            {"role": "system",
-           "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. Respond in Markdown."},
+           "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistakes. Respond in Markdown. Write notes in russian language"},
            {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
      ],
      temperature=0,
