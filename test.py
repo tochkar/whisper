@@ -5,6 +5,7 @@ import boto3
 from dotenv import load_dotenv
 from filelock import FileLock, Timeout
 import whisperx_transcribe as wt
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
