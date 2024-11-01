@@ -67,7 +67,7 @@ def process_file(file):
     phrases = ' '.join(segment['phrase'] for segment in transcript)
 
 # Prepare the request to OpenAI
-    response = openai.ChatCompletion.create(
+    response = client.ChatCompletion.create(
      model='gpt-4o',
         messages=[
            {"role": "system",
