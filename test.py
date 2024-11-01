@@ -50,6 +50,22 @@ def process_file(file):
 
     # Print the JSON output
     print(json_output)
+
+    phrases = ' '.join(segment['phrase'] for segment in transcript)
+
+# Prepare the request to OpenAI
+response = openai.ChatCompletion.create(
+    model='gpt-4o',
+    messages=[
+        {"role": "system", "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. Respond in Markdown."},
+        {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
+    ],
+    temperature=0,
+)
+
+# Print out the response from GPT-4
+print(response.choices[0].message.content)
+
     # Save the transcription result to the output path in the S3 bucket
     # output_path = f'output/{os.path.basename(file)}.txt'
     # s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
