@@ -77,11 +77,16 @@ def process_file(file, writer):
     # Extract date and phone number from the filename
     basename = os.path.basename(file)
     parts = basename.split('_')
-    date = parts[0]  # Assuming date is the first part of the filename
+
+    # Combine date and time parts
+    date_part = parts[0]  # Assuming date is the first part
+    time_part = parts[1].replace('-', ':')  # Assuming time is the second part
+    date_time = f"{date_part} {time_part}"
+
     phone = parts[3].strip()  # Assuming phone is the fourth part
 
     # Create data row including date, phone, and GPT response
-    data = [date, phone, gpt_response]
+    data = [date_time, phone, gpt_response]
 
     # Write the data row to CSV
     writer.writerow(data)
