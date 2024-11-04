@@ -71,7 +71,7 @@ def process_file(file):
         model='gpt-4o',
         messages=[
             {"role": "system",
-             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in russian language in the of response must be only text in format :  имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_ли_такси"},
+             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in russian language in the of response must be only text in format :  имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_такси."},
             {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
         ],
         temperature=0,
@@ -83,8 +83,21 @@ def process_file(file):
     output = response.choices[0].message.content.strip()
     data = output.split(';')
 
-    # CSV output headers
+    # Extract date and phone number from the filename
+    basename = os.path.basename(file)
+    parts = basename.split('_')
+
+    date = parts[0]  # Assuming date is always the first part
+    phone = parts[3].strip()  # Assuming phone is the fourth part
+
+    # Add date and phone to the data list
+    # Create data row with date and phone as the first columns
+    data = [date, phone] + data
+
+    # CSV output headers with date and phone as the first columns
     headers = [
+        "дата",  # Date column
+        "телефон",  # Phone column
         "имя_клиента",
         "адрес_посадки",
         "подъезд",
