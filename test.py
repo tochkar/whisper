@@ -1,6 +1,5 @@
 import csv
 import os
-import re
 import json
 import boto3
 from dotenv import load_dotenv
@@ -15,16 +14,14 @@ load_dotenv()
 bucket = os.environ['BUCKET']
 s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['ACCESS_KEY'],
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
-s3_res = boto3.resource('s3')
 
 
 def list_s3_files():
-    """Lists up to 4 MP3 files available in the S3 bucket."""
+    """Lists up to 5 MP3 files available in the S3 bucket."""
     print(1)
     files = []
     files_needed = 5  # Number of files to retrieve
     paginator = s3.get_paginator('list_objects_v2')
-
     for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/01'):
         if 'Contents' in page:
             for obj in page['Contents']:
@@ -34,13 +31,12 @@ def list_s3_files():
                         break  # Stop if we've collected the desired number of MP3s
         if len(files) >= files_needed:
             break  # Ensure to exit if the limit is reached across pages
-
     print(files)
     return files
 
 
-def process_file(file):
-    """Processes a single MP3 file for transcription."""
+def process_file(file, writer):
+    """Processes a single MP3 file for transcription and writes results to the CSV writer."""
     print("Processing", file)
     model_type_needed = 'large-v2'
     language = 'ru'
@@ -54,21 +50,18 @@ def process_file(file):
 
     print(f"Using model {model_type_needed} and language {language}")
     transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
-
     json_output = json.dumps(transcription, ensure_ascii=False, indent=4)
 
-    # Print the JSON output
-    #print(json_output)
+    # Print the JSON output for debugging
+    print(json_output)
 
     transcript = json.loads(json_output)
 
-    api_key = os.environ['OPENAI_API_KEY']
-
+    api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         api_key = input("Enter your OpenAI API key: ")
 
     client = OpenAI(api_key=api_key)
-
     phrases = ' '.join(segment['phrase'] for segment in transcript)
 
     # Prepare the request to OpenAI
@@ -76,7 +69,7 @@ def process_file(file):
         model='gpt-4o',
         messages=[
             {"role": "system",
-             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in russian language in the of response must be only text in format :  имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_такси."},
+             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognize any type of location try to recognize name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in Russian language. The response must end with text format: имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_ли_такси."},
             {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
         ],
         temperature=0,
@@ -84,21 +77,24 @@ def process_file(file):
 
     # Print out the response from GPT-4
     print(response.choices[0].message.content)
-
     output = response.choices[0].message.content.strip()
     data = output.split(';')
 
     # Extract date and phone number from the filename
     basename = os.path.basename(file)
     parts = basename.split('_')
-
     date = parts[0]  # Assuming date is always the first part
     phone = parts[3].strip()  # Assuming phone is the fourth part
 
     # Add date and phone to the data list
-    # Create data row with date and phone as the first columns
     data = [date, phone] + data
 
+    # Write the data row
+    writer.writerow(data)
+
+
+def main():
+    """Main function to process MP3 files using Whisper."""
     # CSV output headers with date and phone as the first columns
     headers = [
         "дата",  # Date column
@@ -112,7 +108,6 @@ def process_file(file):
         "отправлено_такси"
     ]
 
-    # Create a CSV file in the output directory
     csv_filename = 'output/transcript_data.csv'
 
     # Ensure the output directory exists
@@ -120,28 +115,12 @@ def process_file(file):
 
     with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=';')
+        writer.writerow(headers)  # Write headers only once
 
-        # Write the header
-        writer.writerow(headers)
+        for file in list_s3_files():
+            process_file(file, writer)
 
-        # Write the data row
-        writer.writerow(data)
-
-    # Print confirmation
-    print(f"Data written to CSV file: {csv_filename}")
-
-
-# Save the transcription result to the output path in the S3 bucket
-# output_path = f'output/{os.path.basename(file)}.txt'
-# s3_res.Object(bucket, output_path).put(Body=json.dumps(transcription))
-
-# # Optionally, delete the input file after processing if needed
-# s3_res.Object(bucket, file).delete()
-
-def main():
-    """Main function to process MP3 files using Whisper."""
-    for file in list_s3_files():
-        process_file(file)
+    print("Data written to CSV file: ", csv_filename)
     print("Done")
 
 
