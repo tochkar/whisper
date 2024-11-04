@@ -50,12 +50,8 @@ def process_file(file, writer):
 
     print(f"Using model {model_type_needed} and language {language}")
     transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
-    json_output = json.dumps(transcription, ensure_ascii=False, indent=4)
 
-    # Print the JSON output for debugging
-    print(json_output)
-
-    transcript = json.loads(json_output)
+    transcript = json.loads(json.dumps(transcription, ensure_ascii=False))
 
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
@@ -69,44 +65,32 @@ def process_file(file, writer):
         model='gpt-4o',
         messages=[
             {"role": "system",
-             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognize any type of location try to recognize name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in Russian language. The response must end with text format: имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_ли_такси."},
+             "content": "You are to analyze a transcript of a taxi ordering. Language: Russian. When you recognize any type of location try to recognize the name of Minsk city street correctly. In input text, location can be with mistake. Respond with the entire notes in Russian."},
             {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
         ],
         temperature=0,
     )
 
-    # Print out the response from GPT-4
-    print(response.choices[0].message.content)
-    output = response.choices[0].message.content.strip()
-    data = output.split(';')
+    # Extract and prepare data for CSV
+    gpt_response = response.choices[0].message.content.strip()
 
     # Extract date and phone number from the filename
     basename = os.path.basename(file)
     parts = basename.split('_')
-    date = parts[0]  # Assuming date is always the first part
+    date = parts[0]  # Assuming date is the first part of the filename
     phone = parts[3].strip()  # Assuming phone is the fourth part
 
-    # Add date and phone to the data list
-    data = [date, phone] + data
+    # Create data row including date, phone, and GPT response
+    data = [date, phone, gpt_response]
 
-    # Write the data row
+    # Write the data row to CSV
     writer.writerow(data)
 
 
 def main():
     """Main function to process MP3 files using Whisper."""
-    # CSV output headers with date and phone as the first columns
-    headers = [
-        "дата",  # Date column
-        "телефон",  # Phone column
-        "имя_клиента",
-        "адрес_посадки",
-        "подъезд",
-        "адрес_назначения",
-        "стоимость",
-        "детское_кресло",
-        "отправлено_такси"
-    ]
+    # CSV output headers with date, phone, and GPT response
+    headers = ["дата", "телефон", "ответ_от_GPT"]  # Headers for date, phone, and GPT response
 
     csv_filename = 'output/transcript_data.csv'
 
