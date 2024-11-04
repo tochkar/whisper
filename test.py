@@ -1,3 +1,4 @@
+import csv
 import os
 import re
 import json
@@ -63,22 +64,53 @@ def process_file(file):
 
     client = OpenAI(api_key=api_key)
 
-
     phrases = ' '.join(segment['phrase'] for segment in transcript)
 
-# Prepare the request to OpenAI
+    # Prepare the request to OpenAI
     response = client.chat.completions.create(
-     model='gpt-4o',
+        model='gpt-4o',
         messages=[
-           {"role": "system",
-           "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. Create a features list of the provided transcription. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistakes. Respond in Markdown. Write notes in russian language"},
-           {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
-     ],
-     temperature=0,
+            {"role": "system",
+             "content": "You are to analyze a transcript and extract key features with labels. Language: Russian. When you recognise any type of location try to recognise name of Minsk city street correctly. In input text location can be with mistake. Respond in Markdown. Write notes in russian language in the of response must be only text in format :  имя_клиента;адрес_посадки;подъезд;адрес_назначения;стоимость;детское_кресло;отправлено_ли_такси."},
+            {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
+        ],
+        temperature=0,
     )
 
-# Print out the response from GPT-4
+    # Print out the response from GPT-4
     print(response.choices[0].message.content)
+
+    output = response.choices[0].message.content.strip()
+    data = output.split(';')
+
+    # CSV output headers
+    headers = [
+        "имя_клиента",
+        "адрес_посадки",
+        "подъезд",
+        "адрес_назначения",
+        "стоимость",
+        "детское_кресло",
+        "отправлено_такси"
+    ]
+
+    # Create a CSV file in the output directory
+    csv_filename = 'output/transcript_data.csv'
+
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(csv_filename), exist_ok=True)
+
+    with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file, delimiter=';')
+
+        # Write the header
+        writer.writerow(headers)
+
+        # Write the data row
+        writer.writerow(data)
+
+    # Print confirmation
+    print(f"Data written to CSV file: {csv_filename}")
 
 
 # Save the transcription result to the output path in the S3 bucket
