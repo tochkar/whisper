@@ -48,54 +48,60 @@ def process_file(file, writer):
         print(f"Failed to download file {file}: {e}. Skipping.")
         return
 
-    print(f"Using model {model_type_needed} and language {language}")
-    transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
-
-    transcript = json.loads(json.dumps(transcription, ensure_ascii=False))
-
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        api_key = input("Enter your OpenAI API key: ")
-
-    client = OpenAI(api_key=api_key)
-    phrases = ' '.join(segment['phrase'] for segment in transcript)
-
-    # Prepare the request to OpenAI
-    response = client.chat.completions.create(
-        model='gpt-4o',
-        messages=[
-            {"role": "system",
-             "content": "You are to analyze a transcript of a taxi ordering. Language: Russian. When you recognize any type of location try to recognize the name of Minsk city street correctly. In input text, location can be with mistake. Respond in format имя, адрес_посадки, адрес_назначения, необходимость_в_детском_кресле."},
-            {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
-        ],
-        temperature=0,
-    )
-
-    # Extract and prepare data for CSV
-    gpt_response = response.choices[0].message.content.strip()
-
-    # Extract date and phone number from the filename
-    basename = os.path.basename(file)
-    parts = basename.split('_')
-
-    # Combine date and time parts
-    date_part = parts[0]  # Assuming date is the first part
-    time_part = parts[1].replace('-', ':')  # Assuming time is the second part
-    date_time = f"{date_part} {time_part}"
-
-    phone = parts[3].strip()  # Assuming phone is the fourth part
-
-    # Create data row including date, phone, and GPT response
-    data = [date_time, phone, gpt_response]
-
-    # Write the data row to CSV
-    writer.writerow(data)
-    # Remove the local audio file after processing
     try:
-        os.remove(local_file_path)
-        print(f"Removed local file: {local_file_path}")
+        print(f"Using model {model_type_needed} and language {language}")
+        transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
+
+        transcript = json.loads(json.dumps(transcription, ensure_ascii=False))
+
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            api_key = input("Enter your OpenAI API key: ")
+
+        client = OpenAI(api_key=api_key)
+        phrases = ' '.join(segment['phrase'] for segment in transcript)
+
+        # Prepare the request to OpenAI
+        response = client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system",
+                 "content": "You are to analyze a transcript of a taxi ordering. Language: Russian. When you recognize any type of location try to recognize the name of Minsk city street correctly. In input text, location can be with mistake. Respond in format имя, адрес_посадки, адрес_назначения, необходимость_в_детском_кресле."},
+                {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
+            ],
+            temperature=0,
+        )
+
+        # Extract and prepare data for CSV
+        gpt_response = response.choices[0].message.content.strip()
+
+        # Extract date and phone number from the filename
+        basename = os.path.basename(file)
+        parts = basename.split('_')
+
+        # Combine date and time parts
+        date_part = parts[0]  # Assuming date is the first part
+        time_part = parts[1].replace('-', ':')  # Assuming time is the second part
+        date_time = f"{date_part} {time_part}"
+
+        phone = parts[3].strip()  # Assuming phone is the fourth part
+
+        # Create data row including date, phone, and GPT response
+        data = [date_time, phone, gpt_response]
+
+        # Write the data row to CSV
+        writer.writerow(data)
+
     except Exception as e:
-        print(f"Failed to remove file {local_file_path}: {e}")
+        print(f"Failed to process file {file}: {e}")
+
+    finally:
+        # Attempt to remove the local file regardless of success
+        try:
+            os.remove(local_file_path)
+            print(f"Removed local file: {local_file_path}")
+        except Exception as e:
+            print(f"Failed to remove file {local_file_path}: {e}")
 
 
 def main():
