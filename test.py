@@ -90,6 +90,12 @@ def process_file(file, writer):
 
     # Write the data row to CSV
     writer.writerow(data)
+    # Remove the local audio file after processing
+    try:
+        os.remove(local_file_path)
+        print(f"Removed local file: {local_file_path}")
+    except Exception as e:
+        print(f"Failed to remove file {local_file_path}: {e}")
 
 
 def main():
