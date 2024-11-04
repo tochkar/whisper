@@ -19,17 +19,22 @@ s3_res = boto3.resource('s3')
 
 
 def list_s3_files():
+    """Lists up to 4 MP3 files available in the S3 bucket."""
     print(1)
-    """Lists MP3 files available in the S3 bucket."""
     files = []
+    files_needed = 5  # Number of files to retrieve
     paginator = s3.get_paginator('list_objects_v2')
+
     for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/01'):
         if 'Contents' in page:
             for obj in page['Contents']:
                 if obj['Key'].endswith('.mp3'):
                     files.append(obj['Key'])
-                break
-        break
+                    if len(files) >= files_needed:
+                        break  # Stop if we've collected the desired number of MP3s
+        if len(files) >= files_needed:
+            break  # Ensure to exit if the limit is reached across pages
+
     print(files)
     return files
 
@@ -53,7 +58,7 @@ def process_file(file):
     json_output = json.dumps(transcription, ensure_ascii=False, indent=4)
 
     # Print the JSON output
-    print(json_output)
+    #print(json_output)
 
     transcript = json.loads(json_output)
 
