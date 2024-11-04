@@ -65,7 +65,7 @@ def process_file(file, writer):
         model='gpt-4o',
         messages=[
             {"role": "system",
-             "content": "You are to analyze a transcript of a taxi ordering. Language: Russian. When you recognize any type of location try to recognize the name of Minsk city street correctly. In input text, location can be with mistake. Respond with the entire notes in Russian."},
+             "content": "You are to analyze a transcript of a taxi ordering. Language: Russian. When you recognize any type of location try to recognize the name of Minsk city street correctly. In input text, location can be with mistake. Respond in format имя, адрес_посадки, адрес_назначения, необходимость_в_детском_кресле."},
             {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
         ],
         temperature=0,
