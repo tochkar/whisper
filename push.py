@@ -32,7 +32,7 @@ def upload_file_to_s3(file_path, bucket_name):
     s3.upload_file(file_path, bucket_name, object_key)
 
     print(f"File {file_path} uploaded successfully as {object_key}")
-except Exception as e:
+    except Exception as e:
     print(f"Failed to upload file: {e}")
 
 # Example usage
