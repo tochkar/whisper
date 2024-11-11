@@ -20,7 +20,7 @@ def list_s3_files():
     files = []
     files_needed = 100  # Number of files to retrieve
     paginator = s3.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/06'):
+    for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/01'):
         if 'Contents' in page:
             for obj in page['Contents']:
                 if obj['Key'].endswith('.mp3'):
