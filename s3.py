@@ -9,4 +9,4 @@ s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['A
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 
 
-s3.download_file(bucket, 'taxi135_public_Orders-08.2024.csv', 'rows')
+s3.download_file(bucket, 'order.csv', 'rows')
