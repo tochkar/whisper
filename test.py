@@ -16,8 +16,7 @@ s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['A
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 
 def list_s3_files():
-    """Lists up to 5 MP3 files available in the S3 bucket."""
-    print(1)
+    """Lists up to 100 MP3 files available in the S3 bucket."""
     files = []
     files_needed = 100  # Number of files to retrieve
     paginator = s3.get_paginator('list_objects_v2')
@@ -27,15 +26,14 @@ def list_s3_files():
                 if obj['Key'].endswith('.mp3'):
                     files.append(obj['Key'])
                     if len(files) >= files_needed:
-                        break  # Stop if we've collected the desired number of MP3s
+                        break
         if len(files) >= files_needed:
-            break  # Ensure to exit if the limit is reached across pages
+            break
     print(files)
     return files
-   
 
 def process_file(file, rows, csv_filename):
-    """Processes a single MP3 file and updates the corresponding row in the CSV if phone matches."""
+    """Processes a single MP3 file and updates the corresponding row in the CSV if phone matches and column G is empty."""
     print("Processing", file)
     model_type_needed = 'large-v2'
     language = 'ru'
@@ -45,6 +43,7 @@ def process_file(file, rows, csv_filename):
     except Exception as e:
         print(f"Failed to download file {file}: {e}. Skipping.")
         return
+
     try:
         print(f"Using model {model_type_needed} and language {language}")
         transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
@@ -54,6 +53,7 @@ def process_file(file, rows, csv_filename):
             api_key = input("Enter your OpenAI API key: ")
         client = OpenAI(api_key=api_key)
         phrases = ' '.join(segment['phrase'] for segment in transcript)
+        
         # Prepare the request to OpenAI
         response = client.chat.completions.create(
             model='gpt-4o',
@@ -61,39 +61,45 @@ def process_file(file, rows, csv_filename):
                 {"role": "system",
                  "content": ("You are to extract only the pick-up address from the transcript. "
                              "The text is in Russian. "
-                             "Your task is to identify the street and house number accurately..")},
+                             "Your task is to identify the street and house number accurately.")},
                 {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
             ],
             temperature=0,
         )
+        
         # Extract the pick-up address from GPT response
         gpt_response = response.choices[0].message.content.strip()
+        
         # Extract phone number from the filename
         basename = os.path.basename(file)
         parts = basename.split('_')
-        phone = parts[3].strip()  # Assuming phone is the fourth part
+        phone = parts[3].strip()
         
         # Check and replace phone number format if needed
         if phone.startswith('80'):
             phone = '375' + phone[2:]
-
-        # Update the CSV row if phone matches
+        
+        # Update the CSV row if phone matches and column G is empty
         data_updated = False
         for row in rows:
-            if row[1] == phone:
-                row.append(gpt_response)
+            if row[1] == phone and (len(row) < 7 or not row[6]):  # Check if column G (6th index) is empty
+                while len(row) <= 6:  # Ensure there are enough columns
+                    row.append('')
+                row[6] = gpt_response
                 data_updated = True
-                break  # Assuming only one match per file
-
+                break
+        
         if data_updated:
             with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerows(rows)
             print("CSV file updated with new data.")
+    
     except Exception as e:
         print(f"Failed to process file {file}: {e}")
+    
     finally:
-        # Attempt to remove the local file regardless of success
+        # Attempt to remove the local file regardless of how processing went
         try:
             os.remove(local_file_path)
             print(f"Removed local file: {local_file_path}")
@@ -101,7 +107,7 @@ def process_file(file, rows, csv_filename):
             print(f"Failed to remove file {local_file_path}: {e}")
 
 def main():
-    """Main function to process a specific MP3 file using Whisper and update the CSV."""
+    """Main function to process MP3 files using Whisper and update the CSV."""
     csv_filename = 'rows.csv'
     rows = []
     
