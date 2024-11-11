@@ -17,7 +17,7 @@ s3 = boto3.client(
 )
 
 
-def upload_file_to_s3(file_path, bucket_name, object_key=None):
+def upload_file_to_s3(file_path, bucket_name):
     """
     Upload a file to an S3 bucket.
     
@@ -27,13 +27,8 @@ def upload_file_to_s3(file_path, bucket_name, object_key=None):
         :return: None
         """
 
-
-try:
-    if object_key is None:
-        object_key = os.path.basename(file_path)
-
+    object_key = os.path.basename(file_path)
     print(f"Uploading {file_path} to {bucket_name} with key {object_key}...")
-
     s3.upload_file(file_path, bucket_name, object_key)
 
     print(f"File {file_path} uploaded successfully as {object_key}")
@@ -43,6 +38,5 @@ except Exception as e:
 # Example usage
 local_file_path = 'rows.csv'  # Replace with your local file path
 bucket_name = bucket  # The bucket name from your environment variables
-s3_object_key = 'your/key/in/s3.ext'  # Replace with the desired key name in S3
 
-upload_file_to_s3(local_file_path, bucket_name, s3_object_key)
+upload_file_to_s3(local_file_path, bucket_name)
