@@ -45,9 +45,8 @@ def process_file(file, rows, csv_filename):
             messages=[
                 {"role": "system",
                  "content": ("You are to extract only the pick-up address from the transcript. "
-                             "The text is in Russian. Streets and house numbers in Minsk may be recognized with errors. "
-                             "Try to correct the mistakes based on Minsk street names and house numbers. "
-                             "Your task is to identify the street and house number accurately.")},
+                             "The text is in Russian. "
+                             "Your task is to identify the street and house number accurately..")},
                 {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
             ],
             temperature=0,
