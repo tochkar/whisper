@@ -16,8 +16,23 @@ s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['A
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 
 def list_s3_files():
-    """Returns a specific MP3 file from the S3 bucket."""
-    return ['in/2024/08/07/2024-08-07_00-00-45_135_80293353525_2_9d735cbc-0d63-47b1-aa75-902c7de32202.mp3']
+    """Lists up to 5 MP3 files available in the S3 bucket."""
+    print(1)
+    files = []
+    files_needed = 100  # Number of files to retrieve
+    paginator = s3.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/06'):
+        if 'Contents' in page:
+            for obj in page['Contents']:
+                if obj['Key'].endswith('.mp3'):
+                    files.append(obj['Key'])
+                    if len(files) >= files_needed:
+                        break  # Stop if we've collected the desired number of MP3s
+        if len(files) >= files_needed:
+            break  # Ensure to exit if the limit is reached across pages
+    print(files)
+    return files
+   
 
 def process_file(file, rows, csv_filename):
     """Processes a single MP3 file and updates the corresponding row in the CSV if phone matches."""
