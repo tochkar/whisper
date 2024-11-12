@@ -15,21 +15,25 @@ bucket = os.environ['BUCKET']
 s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['ACCESS_KEY'],
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 
+
 def get_phone_numbers_from_csv(csv_filename, limit=None):
-    """Extract phone numbers from column B of the CSV file and remove the '375' prefix, limiting to a specified number of entries."""
+    """Extract phone numbers from column B of rows where column G is empty, limiting to a specified number of entries."""
     phone_numbers = []
+    rows_to_process = []
     try:
         with open(csv_filename, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.reader(file)
-            next(reader)  # Skip the header, if present
             for row in reader:
                 if len(row) > 1 and row[1].startswith('375'):
-                    phone_numbers.append(row[1][3:])  # Remove the '375' prefix
+                    if len(row) <= 6 or not row[6]:  # Only consider rows where column G is empty
+                        phone_numbers.append(row[1][3:])  # Remove the '375' prefix
+                        rows_to_process.append(row)
                 if limit and len(phone_numbers) >= limit:
                     break
     except Exception as e:
         print(f"Failed to read CSV file {csv_filename}: {e}")
-    return phone_numbers
+    return phone_numbers, rows_to_process
+
 
 def list_all_files_in_s3(bucket_name, prefix):
     """List all MP3 files within and beyond a given S3 prefix."""
@@ -42,8 +46,9 @@ def list_all_files_in_s3(bucket_name, prefix):
                     files.append(obj['Key'])
     return files
 
-def process_file(file, phone, rows, csv_filename):
-    """Process the MP3 file and update the corresponding row in the CSV."""
+
+def process_file(file, phone, rows):
+    """Process the MP3 file."""
     print("Processing file", file)
     model_type_needed = 'large-v2'
     language = 'ru'
@@ -61,42 +66,36 @@ def process_file(file, phone, rows, csv_filename):
         api_key = os.environ.get('OPENAI_API_KEY')
         client = OpenAI(api_key=api_key)
         phrases = ' '.join(segment['phrase'] for segment in transcript)
-        
+
         # Prepare the request to OpenAI
         response = client.chat.completions.create(
             model='gpt-4o',
             messages=[
                 {"role": "system",
-                 "content": ("Extract only the pick-up address from the transcript. "
-                             "The text is in Russian. "
-                             "Identify the street and house number accurately.")},
+                 "content": ("Your task is to extract only the pick-up address from the transcript. "
+                             "Language: Russian. "
+                             "Ensure that the street name and house number are correct and exist in Minsk, Belarus. "
+                             "If errors or ambiguities are present, correct them based on known streets in Minsk. "
+                             "Return only the street name and house number, ensuring the street is valid in Minsk.")},
                 {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
             ],
             temperature=0,
         )
-        
+
         # Extract the pick-up address from the GPT response
         gpt_response = response.choices[0].message.content.strip()
-        
-        # Update the CSV row if the phone matches and column G is empty
-        data_updated = False
+
+        # Update the CSV row if the phone matches
         for row in rows:
-            if len(row) > 1 and row[1] == '375' + phone and (len(row) < 7 or not row[6]):
+            if len(row) > 1 and row[1] == '375' + phone:
                 while len(row) <= 6:  # Ensure there are enough columns
                     row.append('')
                 row[6] = gpt_response
-                data_updated = True
                 break
-        
-        if data_updated:
-            with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerows(rows)
-            print("CSV file updated with new data.")
-    
+
     except Exception as e:
         print(f"Failed to process file {file}: {e}")
-    
+
     finally:
         # Attempt to remove the local file regardless of how processing went
         try:
@@ -105,31 +104,30 @@ def process_file(file, phone, rows, csv_filename):
         except Exception as e:
             print(f"Failed to remove file {local_file_path}: {e}")
 
+
 def main():
     """Main function to process MP3 files using Whisper and update the CSV."""
     csv_filename = 'rows.csv'
-    rows = []
     number_of_phones_to_process = 10  # Set the desired number of phone numbers to process
-    
-    # Read existing CSV rows
-    try:
-        with open(csv_filename, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            rows = list(reader)
-    except Exception as e:
-        print(f"Failed to read CSV file {csv_filename}: {e}")
-        return
-    
-    phone_numbers = get_phone_numbers_from_csv(csv_filename, limit=number_of_phones_to_process)
+
+    # Read existing CSV rows and filter out those where column G is empty
+    phone_numbers, rows_to_process = get_phone_numbers_from_csv(csv_filename, limit=number_of_phones_to_process)
+
     all_s3_files = list_all_files_in_s3(bucket, 'in/2024/08/')
 
     for phone in phone_numbers:
         for s3_file in all_s3_files:
             if phone in s3_file:
-                process_file(s3_file, phone, rows, csv_filename)
+                process_file(s3_file, phone, rows_to_process)
                 break  # Stop searching if the file with this phone number is processed
-    
+
+    # Write updates to the CSV file only after processing all files
+    with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerows(rows_to_process)
+
     print("Done")
+
 
 if __name__ == "__main__":
     try:
