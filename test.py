@@ -108,7 +108,7 @@ def process_file(file, phone, rows):
 def main():
     """Main function to process MP3 files using Whisper and update the CSV."""
     csv_filename = 'rows.csv'
-    number_of_phones_to_process = 10  # Set the desired number of phone numbers to process
+    number_of_phones_to_process = 11  # Set the desired number of phone numbers to process
 
     # Read existing CSV rows and filter out those where column G is empty
     phone_numbers, rows_to_process = get_phone_numbers_from_csv(csv_filename, limit=number_of_phones_to_process)
