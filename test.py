@@ -15,26 +15,36 @@ bucket = os.environ['BUCKET']
 s3 = boto3.client('s3', region_name='eu-west-1', aws_access_key_id=os.environ['ACCESS_KEY'],
                   aws_secret_access_key=os.environ['SECRET_KEY'], aws_session_token=os.environ['SESSION_TOKEN'])
 
-def list_s3_files():
-    """Lists up to 100 MP3 files available in the S3 bucket."""
+def get_phone_numbers_from_csv(csv_filename, limit=None):
+    """Extract phone numbers from column B of the CSV file and remove the '375' prefix, limiting to a specified number of entries."""
+    phone_numbers = []
+    try:
+        with open(csv_filename, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header, if present
+            for row in reader:
+                if len(row) > 1 and row[1].startswith('375'):
+                    phone_numbers.append(row[1][3:])  # Remove the '375' prefix
+                if limit and len(phone_numbers) >= limit:
+                    break
+    except Exception as e:
+        print(f"Failed to read CSV file {csv_filename}: {e}")
+    return phone_numbers
+
+def list_all_files_in_s3(bucket_name, prefix):
+    """List all MP3 files within and beyond a given S3 prefix."""
     files = []
-    files_needed = 100  # Number of files to retrieve
     paginator = s3.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=bucket, Prefix='in/2024/08/01'):
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
         if 'Contents' in page:
             for obj in page['Contents']:
                 if obj['Key'].endswith('.mp3'):
                     files.append(obj['Key'])
-                    if len(files) >= files_needed:
-                        break
-        if len(files) >= files_needed:
-            break
-    print(files)
     return files
 
-def process_file(file, rows, csv_filename):
-    """Processes a single MP3 file and updates the corresponding row in the CSV if phone matches and column G is empty."""
-    print("Processing", file)
+def process_file(file, phone, rows, csv_filename):
+    """Process the MP3 file and update the corresponding row in the CSV."""
+    print("Processing file", file)
     model_type_needed = 'large-v2'
     language = 'ru'
     local_file_path = 'audio/' + os.path.basename(file)
@@ -49,8 +59,6 @@ def process_file(file, rows, csv_filename):
         transcription = wt.transcribe(local_file_path, model_type_needed, language=language)
         transcript = json.loads(json.dumps(transcription, ensure_ascii=False))
         api_key = os.environ.get('OPENAI_API_KEY')
-        if not api_key:
-            api_key = input("Enter your OpenAI API key: ")
         client = OpenAI(api_key=api_key)
         phrases = ' '.join(segment['phrase'] for segment in transcript)
         
@@ -59,30 +67,21 @@ def process_file(file, rows, csv_filename):
             model='gpt-4o',
             messages=[
                 {"role": "system",
-                 "content": ("You are to extract only the pick-up address from the transcript. "
+                 "content": ("Extract only the pick-up address from the transcript. "
                              "The text is in Russian. "
-                             "Your task is to identify the street and house number accurately.")},
+                             "Identify the street and house number accurately.")},
                 {"role": "user", "content": f"The following is a series of phrases from a transcript:\n{phrases}"}
             ],
             temperature=0,
         )
         
-        # Extract the pick-up address from GPT response
+        # Extract the pick-up address from the GPT response
         gpt_response = response.choices[0].message.content.strip()
         
-        # Extract phone number from the filename
-        basename = os.path.basename(file)
-        parts = basename.split('_')
-        phone = parts[3].strip()
-        
-        # Check and replace phone number format if needed
-        if phone.startswith('80'):
-            phone = '375' + phone[2:]
-        
-        # Update the CSV row if phone matches and column G is empty
+        # Update the CSV row if the phone matches and column G is empty
         data_updated = False
         for row in rows:
-            if row[1] == phone and (len(row) < 7 or not row[6]):  # Check if column G (6th index) is empty
+            if len(row) > 1 and row[1] == '375' + phone and (len(row) < 7 or not row[6]):
                 while len(row) <= 6:  # Ensure there are enough columns
                     row.append('')
                 row[6] = gpt_response
@@ -110,6 +109,7 @@ def main():
     """Main function to process MP3 files using Whisper and update the CSV."""
     csv_filename = 'rows.csv'
     rows = []
+    number_of_phones_to_process = 10  # Set the desired number of phone numbers to process
     
     # Read existing CSV rows
     try:
@@ -117,11 +117,17 @@ def main():
             reader = csv.reader(file)
             rows = list(reader)
     except Exception as e:
-        print(f"Could not read CSV file {csv_filename}: {e}")
+        print(f"Failed to read CSV file {csv_filename}: {e}")
         return
     
-    for file in list_s3_files():
-        process_file(file, rows, csv_filename)
+    phone_numbers = get_phone_numbers_from_csv(csv_filename, limit=number_of_phones_to_process)
+    all_s3_files = list_all_files_in_s3(bucket, 'in/2024/08/')
+
+    for phone in phone_numbers:
+        for s3_file in all_s3_files:
+            if phone in s3_file:
+                process_file(s3_file, phone, rows, csv_filename)
+                break  # Stop searching if the file with this phone number is processed
     
     print("Done")
 
